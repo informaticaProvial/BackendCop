@@ -8,6 +8,8 @@ const { application } = require('express');
 const app = express();
 const bodyParser = require('body-parser')
 
+const multer = require('multer');
+
 
 // para que no bloqueara la solicitud htpp ya que es solamente de prueba
 app.use(cors());
@@ -41,6 +43,25 @@ connection.connect((err) => {
     if (err) throw err;
     console.log('Successfully connected to the database.'); 
 });
+
+//--- LOGIN --
+app.post('/login', (req, res) => {
+  const { USUARIOC4, PASSWORD } = req.body;
+
+  connection.query('SELECT * FROM usuarios WHERE USUARIOC4 = ? AND PASSWORD = ?', [USUARIOC4, PASSWORD], (err, result) => {
+      if (err) {
+          console.error('Error al realizar la consulta:', err);
+          res.status(500).json({ error: 'Error al realizar la consulta' });
+      } else {
+          if (result.length > 0) {
+              res.status(200).json({ message: 'Login exitoso' });
+          } else {
+              res.status(401).json({ error: 'Nombre de usuario o contraseña incorrectos' });
+          }
+      }
+  });
+});
+
 
 
 // -------------- ACCIDENTE VIAL --------------
@@ -386,26 +407,29 @@ app.get('/brigadas/:num_placa', (req, res) => {
 
   // Manejar solicitud POST para agregar un reportes_operativos
   app.post("/reportes_operativos", (req, res) => {
-    // Obtener los datos de los reportes_operativos
-    const { name, capacity } = req.body;
+     // Obtener los datos de los reportes_operativos
+  const {REPORTE_NUM, FECHA, HORA, UNIDAD_NUM, SECTOR, UBICACION, DIRECC_SENTIDO, REPORTE_TIPO, USUARIO, VALIDADO } = req.body;
 
-    // Construir la consulta SQL para insertar reportes_operativos
-    const sql = `INSERT INTO reportes_operativos (name, capacity) VALUES ('${name}', '${capacity}')`;
-    
-    // Ejecutar la consulta SQL
-    connection.query(sql, (error, result) => {
-      if (error) {
-        // Enviar una respuesta de error al cliente
-        return res.status(500).json({
-          error: error.message
-        });
-      }
-
-      // Enviar una respuesta de éxito al cliente
-      res.json({
-        message: "Reporte Operativo agregada exitosamente"
+  // Construir la consulta SQL para insertar reportes_operativos
+  const sql = `INSERT INTO reportes_operativos (REPORTE_NUM, FECHA, HORA, UNIDAD_NUM, SECTOR, UBICACION, DIRECC_SENTIDO, REPORTE_TIPO, USUARIO, VALIDADO)
+   VALUES ('${REPORTE_NUM}', '${FECHA}',
+    '${HORA}',  '${UNIDAD_NUM}',  '${SECTOR}',  '${UBICACION}',
+    '${DIRECC_SENTIDO}', '${REPORTE_TIPO}', '${USUARIO}', '${VALIDADO}')`;
+  
+  // Ejecutar la consulta SQL
+  connection.query(sql, (error, result) => {
+    if (error) {
+      // Enviar una respuesta de error al cliente
+      return res.status(500).json({
+        error: error.message
       });
+    }
+
+    // Enviar una respuesta de éxito al cliente
+    res.json({
+      message: "Reporte operativo agregado exitosamente"
     });
+  });
   });
 
   
@@ -419,11 +443,17 @@ app.get('/brigadas/:num_placa', (req, res) => {
     const offset = (currentPage - 1) * itemsPerPage; // Calcular el offset
   
     const query = `
-      SELECT * 
-      FROM reportes_operativos 
-      WHERE fecha >= ? AND fecha <= ? 
-      GROUP BY unidad_num 
-      ORDER BY sector`; // Agregar LIMIT y OFFSET a la consulta
+    SELECT ro.REPORTE_NUM, ro.FECHA, ro.HORA, ro.UNIDAD_NUM, ro.SECTOR, ro.UBICACION, ro.DIRECC_SENTIDO, ro.REPORTE_TIPO, ro.USUARIO, ro.VALIDADO
+    FROM reportes_operativos ro
+    INNER JOIN unidades u ON ro.unidad_num = u.unidad_num
+    WHERE (ro.unidad_num, ro.hora) IN (
+        SELECT unidad_num, MAX(hora)
+        FROM reportes_operativos
+        WHERE fecha = CURDATE()
+        GROUP BY unidad_num
+    )
+    AND ro.fecha = CURDATE() 
+    ORDER BY ro.reporte_num DESC;`; // Agregar LIMIT y OFFSET a la consulta
   
     connection.query(
       query,
@@ -488,14 +518,22 @@ app.get('/brigadas/:num_placa', (req, res) => {
           }
       );
   });
-  
-
-    
 
     // all tipos_reporte
     app.get('/tipos_reporte', (req, res) => {
       // Obtener todas los tipos_reporte de la base de datos
       connection.query('SELECT * FROM tipos_reporte', (error, results) => {
+          if (error) {
+              return res.status(500).send(error);
+          }
+          res.json(results);
+      });
+    });
+
+    // reporte operativo desc
+    app.get('/reportes_operativos_desc', (req, res) => {
+      // Obtener todas los reportes_operativos de la base de datos
+      connection.query('SELECT * FROM reportes_operativos order by fecha desc LIMIT 1', (error, results) => {
           if (error) {
               return res.status(500).send(error);
           }
@@ -646,3 +684,247 @@ app.listen(3000, () => {
 });
 
 
+
+// ------------------ OFICIOS ---------------------
+
+// Manejar solicitud POST para agregar un oficio
+app.post("/oficios", (req, res) => {
+  // Obtener los datos de los oficios
+  const { id, numero_oficio, fecha, dirigido, entrada_saliente,
+     archivos_pdf, comentario, archivos_copia_pdf } = req.body;
+
+  // Construir la consulta SQL para insertar oficios
+  const sql = `INSERT INTO oficios (id, numero_oficio, fecha, dirigido, entrada_saliente,
+    archivos_pdf, comentario, archivos_copia_pdf) VALUES ('${id}', '${numero_oficio}',
+    '${fecha}',  '${dirigido}',  '${entrada_saliente}',  '${archivos_pdf}'
+    '${comentario}',  '${archivos_copia_pdf}' )`;
+  
+  // Ejecutar la consulta SQL
+  connection.query(sql, (error, result) => {
+    if (error) {
+      // Enviar una respuesta de error al cliente
+      return res.status(500).json({
+        error: error.message
+      });
+    }
+
+    // Enviar una respuesta de éxito al cliente
+    res.json({
+      message: "Oficio agregada exitosamente"
+    });
+  });
+});
+
+// all brigadas
+app.get('/oficios', (req, res) => {
+  // Obtener todos los brigadas de la base de datos
+  connection.query('SELECT * FROM oficios', (error, results) => {
+      if (error) {
+          return res.status(500).send(error);
+      }
+      res.json(results);
+  });
+});
+
+
+// brigadas id
+app.get('/oficios/:numero_oficio', (req, res) => {
+const id = req.params.id;
+const query = `SELECT * FROM oficios WHERE numero_oficio = ${numero_oficio}`;
+connection.query(query, (error, results) => {
+if (error) throw error;
+res.send(results[0]);
+});
+});
+
+// Manejar solicitud DELETE para eliminar oficios
+app.delete("/oficios/:id", (req, res) => {
+  // Obtener el ID de la oficios a eliminar
+  const oficioId = req.params.id;
+
+  // Construir la consulta SQL para eliminar oficios
+  const sql = `DELETE FROM oficios WHERE id = ${oficioId}`;
+
+  // Ejecutar la consulta SQL
+  connection.query(sql, (error, result) => {
+  if (error) {
+      // Enviar una respuesta de error al cliente
+      return res.status(500).json({
+      error: error.message
+      });
+  }
+
+// Enviar una respuesta de éxito al cliente
+res.json({
+  message: "Oficio eliminado exitosamente"
+});
+});
+});
+
+
+
+  // Manejar solicitud PUT para actualizar oficios
+  app.put("/oficios/:num_placa", (req, res) => {
+    // Obtener el ID de oficios a actualizar
+    const oficioId = req.params.numero_oficio;
+    // obtener los nuevos datos de oficios
+    const { name, capacity } = req.body;
+    
+    // Construir la consulta SQL para actualizar oficios
+    const sql = `UPDATE oficios SET numero_oficio = '${numero_oficio}',
+    brigada_nom = '${brigada_nom}',
+    brigada_nit = '${brigada_nit}',
+    telefono1 = '${telefono1}',
+    telefono2 = '${telefono2}',
+    telefono3 = '${telefono3}',
+    telefono4 = '${telefono4}',
+    activo = '${activo}' WHERE reporte_num = ${oficioId}`;
+
+    // Ejecutar la consulta SQL
+    connection.query(sql, (error, result) => {
+    if (error) {
+        // Enviar una respuesta de error al cliente
+        return res.status(500).json({
+        error: error.message
+        });
+    }
+    
+
+    // Enviar una respuesta de éxito al cliente
+    res.json({
+        message: "Oficio actualizado exitosamente"
+    });
+    });
+});
+
+ /* const upload = multer({ storage });
+
+  app.use(express.json());
+
+  // Ruta para cargar un archivo al servidor
+  app.post('/subir-archivo', upload.single('archivos_pdf'), (req, res) => {
+    // Aquí puedes procesar el archivo y obtener su ruta en el servidor
+    const filePath = req.file.path; // Esto obtiene la ruta del archivo en el servidor
+
+    // Devuelve la ruta del archivo como respuesta
+    res.json({ filePath });
+  });*/
+
+
+//  ----------------- INGRESO ORDEN ---------------------
+app.post("/unidades_sectores", (req, res) => {
+  // Obtener los datos de los unidades_sectores
+  const {SECTOR_CODIGO, UNIDAD_NUM, DIA_TURNO, UNIDA_BRIGADA1, UNIDA_BRIGADA2, HORA_INICIO, HORA_FINAL } = req.body;
+
+  // Construir la consulta SQL para insertar unidades_sectores
+  const sql = `INSERT INTO unidades_sectores (SECTOR_CODIGO, UNIDAD_NUM, DIA_TURNO, UNIDA_BRIGADA1, UNIDA_BRIGADA2, HORA_INICIO, HORA_FINAL)
+   VALUES ('${SECTOR_CODIGO}', '${UNIDAD_NUM}',
+    '${DIA_TURNO}',  '${UNIDA_BRIGADA1}',  '${UNIDA_BRIGADA2}',  '${HORA_INICIO}',
+    '${HORA_FINAL}')`;
+  
+  // Ejecutar la consulta SQL
+  connection.query(sql, (error, result) => {
+    if (error) {
+      // Enviar una respuesta de error al cliente
+      return res.status(500).json({
+        error: error.message
+      });
+    }
+
+    // Enviar una respuesta de éxito al cliente
+    res.json({
+      message: "Orden agregada exitosamente"
+    });
+  });
+});
+
+app.post("/c_odometro", (req, res) => {
+  // Obtener los datos de los unidades_sectores
+  const {unidad_num, usuario, fecha, odo_ant, odo_nue } = req.body;
+
+  // Construir la consulta SQL para insertar unidades_sectores
+  const sql = `INSERT INTO unidades_sectores (unidad_num, usuario, fecha, odo_ant,
+    odo_nue) VALUES ('${unidad_num}', '${usuario}',
+    '${fecha}',  '${odo_ant}',  '${odo_nue}')`;
+  
+  // Ejecutar la consulta SQL
+  connection.query(sql, (error, result) => {
+    if (error) {
+      // Enviar una respuesta de error al cliente
+      return res.status(500).json({
+        error: error.message
+      });
+    }
+
+    // Enviar una respuesta de éxito al cliente
+    res.json({
+      message: "Odometro agregado exitosamente"
+    });
+  });
+});
+
+//----------BITACORA------
+
+/*app.get('/patrullajesbitacora', (req, res) => {
+  const unidad_num = req.query.unidad_num;
+  const fechaInicio = req.query.fechaInicio;
+  const fechaFin = req.query.fechaFin;
+
+  // Asegúrate de que las fechas estén en el formato adecuado para MySQL (YYYY-MM-DD)
+  const fechaInicioFormatted = fechaInicio.toISOString().split('T')[0];
+  const fechaFinFormatted = fechaFin.toISOString().split('T')[0];
+
+  const query = `
+    SELECT *
+    FROM patrullajes
+    WHERE unidad_num = ${unidad_num}
+      AND dia_turno BETWEEN '${fechaInicioFormatted}' AND '${fechaFinFormatted}'
+    ORDER BY dia_turno DESC
+  `;
+  connection.query(query, (error, results) => {
+    if (error) {
+      return res.status(500).send(error);
+    }
+    res.json(results);
+  });
+});*/
+
+
+     // all BITACORA para reportes
+     app.get('/patrullajesbitacora', (req, res) => {
+      const currentDate = new Date().toISOString().split('T')[0]; // Obtener la fecha actual en formato YYYY-MM-DD
+  
+      // Obtener los parámetros de la solicitud
+      const filtroPatrulla = req.query.filtroPatrulla || ''; // Si no se proporciona, se toma como vacío
+      const fechaInicio = req.query.fechaInicio || (currentDate + ' 00:00:00'); // Si no se proporciona, se toma el inicio del día actual
+      const fechaFin = req.query.fechaFin || (currentDate + ' 23:59:59'); // Si no se proporciona, se toma el final del día actual
+
+      // Obtener los parámetros de paginación
+      const page = req.query.page || 1; // Número de página actual
+      const pageSize = req.query.pageSize || 10; // Tamaño de cada página
+
+      // Calcular el índice de inicio y el límite para la paginación
+      const startIndex = (page - 1) * pageSize;
+      const endIndex = startIndex + pageSize;
+
+      // Construir la consulta SQL con los parámetros
+      const query = `
+      SELECT * 
+      FROM patrullajes 
+      WHERE dia_turno >= '${fechaInicio}' AND dia_turno <= '${fechaFin}'
+        AND (unidad_num = '${filtroPatrulla}' OR '${filtroPatrulla}' = '')
+      ORDER BY dia_turno`;
+  
+  
+      // Ejecutar la consulta
+      connection.query(
+          query,
+          [fechaInicio, fechaFin,  filtroPatrulla, pageSize, startIndex],
+          (error, results) => {
+              if (error) {
+                  return res.status(500).send(error);
+              }
+              res.json(results);
+          }
+      );
+  });
