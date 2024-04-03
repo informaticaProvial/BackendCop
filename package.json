@@ -1,14 +1,14 @@
 {
-  "name": "cine-backend",
+  "name": "backend-cop",
   "version": "1.0.0",
-  "description": "backend para cinetav prueba de tav",
+  "description": "backend para sistema cop",
   "main": "index.js",
   "scripts": {
     "test": "npm test"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/elopez2019/cinebackend.git"
+    "url": "git+https://github.com/informaticaProvial/BackendCop.git"
   },
   "keywords": [
     "ito&mily2020"
@@ -16,13 +16,14 @@
   "author": "Emilie Hernandez",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/elopez2019/cinebackend/issues"
+    "url": ""
   },
-  "homepage": "https://github.com/elopez2019/cinebackend#readme",
+  "homepage": "",
   "dependencies": {
     "body-parser": "^1.20.1",
     "cors": "^2.8.5",
     "express": "^4.18.2",
+    "multer": "^1.4.5-lts.1",
     "mysql": "^2.18.1",
     "mysql2": "^3.0.1",
     "sequelize": "^6.28.0",
